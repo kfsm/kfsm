@@ -22,7 +22,7 @@
 -include("kfsm.hrl").
 
 -export([
-   start_link/1, 
+   start_link/2, 
    init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3
 ]).
 
@@ -37,11 +37,11 @@
 
 %%
 %%
-start_link(Mod) ->
-   gen_server:start_link(?MODULE, [Mod], []).
+start_link(Mod, Args) ->
+   gen_server:start_link(?MODULE, [Mod, Args], []).
 
-init([Mod]) ->
-   init(Mod:init([]), #machine{mod=Mod, q=q:new()}).
+init([Mod, Args]) ->
+   init(Mod:init(Args), #machine{mod=Mod, q=q:new()}).
 
 init({ok, Sid, State}, S) ->
    {ok, S#machine{sid=Sid, state=State}};

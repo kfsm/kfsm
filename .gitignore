@@ -5,6 +5,7 @@
 *.dump
 *.tag.gz
 *.tgz
+*.synctex.gz
 deps.config
 ebin/
 deps/

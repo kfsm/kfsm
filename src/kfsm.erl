@@ -21,7 +21,7 @@
 -include("kfsm.hrl").
 
 -export([
-   start_link/1, cast/2, call/2, call/3, send/2
+   start_link/2, cast/2, call/2, call/3, send/2
 ]).
 
 -type(fsm() :: atom() | pid() | any()).
@@ -31,10 +31,10 @@
 %% The function creates a new container process for state machine.
 %% The function Mod:init is called to build internal state data state
 %% and defines initial state (transition function) sid. 
--spec(start_link/1 :: (atom()) -> {ok, pid()} | {error, any()}).
+-spec(start_link/2 :: (atom(), list()) -> {ok, pid()} | {error, any()}).
 
-start_link(Mod) ->
-   kfsm_machine:start_link(Mod).
+start_link(Mod, Opts) ->
+   kfsm_machine:start_link(Mod, Opts).
 
 %%
 %% the cast operation sends any message to the state machine and 
