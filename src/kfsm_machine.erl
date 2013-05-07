@@ -89,6 +89,9 @@ code_change(_Vsn, S, _) ->
 %%%
 %%%----------------------------------------------------------------------------   
 
+handle_result(Result, undefined, #machine{q={}}=S) ->
+   handle_result(Result, null, S);
+
 handle_result(Result, undefined, S) ->
    {Tx, Q} = q:deq(S#machine.q),   
    handle_result(Result, Tx, S#machine{q=Q});
