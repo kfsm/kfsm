@@ -1,0 +1,18 @@
+{application, kfsm,
+   [
+      {description, "finite state machine"},
+      {vsn,         "0.0.0"},
+      {modules,     [
+         kfsm,
+         kfsm_sup,
+         kfsm_app
+      ]},
+      {registered,  []},
+      {applications,[
+         kernel,
+         stdlib
+      ]},
+      {mod, {kfsm_app, []}},
+      {env, []}
+   ]
+}.  
