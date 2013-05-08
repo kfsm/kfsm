@@ -42,7 +42,7 @@ long_cast_success() ->
 
 cast_failure() ->
    Ref2 = kfsm:cast('FSM', badarg),
-   receive {Ref2, badarg} -> ok end.
+   receive {Ref2, {error, badarg}} -> ok end.
 
 
 call_success() ->
@@ -54,8 +54,8 @@ long_call_success() ->
    pong = gen_server:call('FSM', ping).
 
 call_failure() ->
-   badarg = kfsm:call('FSM', badarg),
-   badarg = gen_server:call('FSM', badarg).
+   {error, badarg} = kfsm:call('FSM', badarg),
+   {error, badarg} = gen_server:call('FSM', badarg).
    
 
 send_success() ->
@@ -68,6 +68,6 @@ long_send_success() ->
 
 send_failure() ->
    ok = kfsm:send('FSM', badarg),
-   receive badarg -> ok end.
+   receive {error, badarg} -> ok end.
 
 

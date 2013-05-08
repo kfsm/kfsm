@@ -61,7 +61,7 @@ terminate(Reason, #machine{mod=Mod}=S) ->
 %%
 handle_call(Msg, Tx, #machine{mod=Mod, sid=Sid}=S) ->
    ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   handle_result(Mod:Sid(Msg, S#machine.state), {gen, Tx}, S).
+   handle_result(Mod:Sid(Msg, S#machine.state), Tx, S).
 
 %%
 %%
@@ -70,7 +70,15 @@ handle_cast(_, S) ->
 
 %%
 %%
-handle_info({kfsm, Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
+handle_info({call, Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
+   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   handle_result(Mod:Sid(Msg, S#machine.state), Tx, S);
+
+handle_info({cast, Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
+   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   handle_result(Mod:Sid(Msg, S#machine.state), Tx, S);
+
+handle_info({send, Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
    ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
    handle_result(Mod:Sid(Msg, S#machine.state), Tx, S);
 
@@ -103,85 +111,28 @@ handle_result({next_state, Sid, State, TorH}, Tx, S) ->
    {noreply, S#machine{sid=Sid, state=State, q=enq(Tx, S)}, TorH};
 
 handle_result({reply, Msg, Sid, State}, Tx, S) ->
-   ack(Msg, Tx),
+   plib:ack(Tx, Msg),
    {noreply, S#machine{sid=Sid, state=State}};
 
 handle_result({reply, Msg, Sid, State, TorH}, Tx, S) ->
-   ack(Msg, Tx),
+   plib:ack(Tx, Msg),
    {noreply, S#machine{sid=Sid, state=State}, TorH};
 
-handle_result({error, Msg, Sid, State}, Tx, S) ->
-   nack(Msg, Tx),
+handle_result({error, Reason, Sid, State}, Tx, S) ->
+   plib:ack(Tx, {error, Reason}),
    {noreply, S#machine{sid=Sid, state=State}};
 
-handle_result({error, Msg, Sid, State, TorH}, Tx, S) ->
-   nack(Msg, Tx),
+handle_result({error, Reason, Sid, State, TorH}, Tx, S) ->
+   plib:ack(Tx, {error, Reason}),
    {noreply, S#machine{sid=Sid, state=State}, TorH};
 
 handle_result({stop, Msg, Reason, State}, Tx, S) ->
-   ack(Msg, Tx),
+   plib:ack(Tx, Msg),
    {stop, Reason, S#machine{state=State}};
 
 handle_result({stop, Reason, State}, Tx, S) ->
    {stop, Reason, S#machine{state=State}}.
 
-
-%%
-%% acknowledge transaction
-ack(Msg, {Pid, Ref}=Tx)
- when is_pid(Pid), is_atom(Msg) ->
-   ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   erlang:send(Pid, {Ref, Msg});
-
-ack(Msg, {Pid, Ref}=Tx)
- when is_pid(Pid) ->
-   ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   erlang:send(Pid, {ok, Ref, Msg});
-
-ack(Msg, Pid)
- when is_pid(Pid) ->
-   ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Pid, Msg]),
-   erlang:send(Pid, Msg);
-
-ack(Msg, {gen, Tx})
- when is_atom(Msg) ->
-   ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   gen_server:reply(Tx, Msg);
-
-ack(Msg, {gen, Tx}) ->
-   ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   gen_server:reply(Tx, {ok, Msg});
-
-ack(_, _) ->
-   ok. %% Tx reference undefined
-
-
-nack(Msg, {Pid, Ref}=Tx)
- when is_pid(Pid), is_atom(Msg) ->
-   ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   erlang:send(Pid, {Ref, Msg});
-
-nack(Msg, {Pid, Ref}=Tx)
- when is_pid(Pid) ->
-   ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   erlang:send(Pid, {error, Ref, Msg});
-
-nack(Msg, Pid)
- when is_pid(Pid) ->
-   ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Pid, Msg]),
-   erlang:send(Pid, Msg); %% (?)
-
-nack(Msg, {gen, Tx})
- when is_atom(Msg) ->
-   ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   gen_server:reply(Tx, Msg);
-
-nack(Msg, {gen, Tx}) ->
-   ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   gen_server:reply(Tx, {error, Msg});
-
-nack(_, _) ->
-   ok. %% Tx reference undefined
 
 %%
 %% enqueue transaction

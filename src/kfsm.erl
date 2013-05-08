@@ -44,10 +44,8 @@ start_link(Mod, Opts) ->
 %% the reference is automatically generated using erlang:make_ref
 -spec(cast/2 :: (fsm(), msg()) -> reference()).
 
-cast(FSM, Msg) ->
-   Ref = erlang:make_ref(),
-   erlang:send(FSM, {kfsm, {self(), Ref}, Msg}),
-   Ref.
+cast(Pid, Msg) ->
+   plib:cast(Pid, Msg).
 
 %%
 %% the call operation sends any message to the state machine and 
@@ -55,37 +53,18 @@ cast(FSM, Msg) ->
 -spec(call/2 :: (fsm(), msg()) -> {ok, msg()} | {error, any()}).
 -spec(call/3 :: (fsm(), msg(), timeout()) -> {ok, msg()} | {error, any()}).
 
-call(FSM, Msg) ->
-   call(FSM, Msg, 5000).
-call(FSM, Msg, Timeout) ->
-   %% TODO: make distributed
-   Ref = erlang:make_ref(),
-   Mon = erlang:monitor(process, FSM),
-   erlang:send(FSM, {kfsm, {self(), Ref}, Msg}),
-   receive
-      {Ref, Reply}        ->
-         erlang:demonitor(Mon, [flush]),
-         Reply;
-      {ok, Ref, Reply} ->
-         erlang:demonitor(Mon, [flush]),
-         {ok, Reply};
-      {error, Ref, Reason} ->
-         erlang:demonitor(Mon, [flush]),
-         {error, Reason};
-      {'DOWN', Mon, _, _, Reason} ->
-         throw(Reason)
-   after Timeout ->
-      erlang:demonitor(Mon, [flush]),
-      throw(timeout)
-   end.
+call(Pid, Msg) ->
+   call(Pid, Msg, 5000).
+
+call(Pid, Msg, Timeout) ->
+   plib:call(Pid, Msg, Timeout).
 
 %%
 %%
 -spec(send/2 :: (fsm(), msg()) -> ok).
 
-send(FSM, Msg) ->
-   erlang:send(FSM, {kfsm, self(), Msg}),
-   ok.
+send(Pid, Msg) ->
+   plib:send(Pid, Msg).
 
 
 
