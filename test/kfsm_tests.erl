@@ -34,28 +34,28 @@ free(Pid) ->
 
 cast_success() ->
    Ref1 = kfsm:cast('FSM', message),
-   receive {ok, Ref1, message} -> ok end.
+   receive {Ref1, message} -> ok end.
 
 long_cast_success() ->
    Ref1 = kfsm:cast('FSM', ping),
-   receive {ok, Ref1, pong} -> ok end.
+   receive {Ref1, pong} -> ok end.
 
 cast_failure() ->
    Ref2 = kfsm:cast('FSM', badarg),
-   receive {error, Ref2, badarg} -> ok end.
+   receive {Ref2, badarg} -> ok end.
 
 
 call_success() ->
-   {ok, message} = kfsm:call('FSM', message),
-   {ok, message} = gen_server:call('FSM', message).
+   message = kfsm:call('FSM', message),
+   message = gen_server:call('FSM', message).
 
 long_call_success() ->
-   {ok, pong} = kfsm:call('FSM', ping),
-   {ok, pong} = gen_server:call('FSM', ping).
+   pong = kfsm:call('FSM', ping),
+   pong = gen_server:call('FSM', ping).
 
 call_failure() ->
-   {error, badarg} = kfsm:call('FSM', badarg),
-   {error, badarg} = gen_server:call('FSM', badarg).
+   badarg = kfsm:call('FSM', badarg),
+   badarg = gen_server:call('FSM', badarg).
    
 
 send_success() ->

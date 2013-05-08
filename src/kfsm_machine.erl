@@ -129,6 +129,11 @@ handle_result({stop, Reason, State}, Tx, S) ->
 %%
 %% acknowledge transaction
 ack(Msg, {Pid, Ref}=Tx)
+ when is_pid(Pid), is_atom(Msg) ->
+   ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   erlang:send(Pid, {Ref, Msg});
+
+ack(Msg, {Pid, Ref}=Tx)
  when is_pid(Pid) ->
    ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
    erlang:send(Pid, {ok, Ref, Msg});
@@ -137,6 +142,11 @@ ack(Msg, Pid)
  when is_pid(Pid) ->
    ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Pid, Msg]),
    erlang:send(Pid, Msg);
+
+ack(Msg, {gen, Tx})
+ when is_atom(Msg) ->
+   ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   gen_server:reply(Tx, Msg);
 
 ack(Msg, {gen, Tx}) ->
    ?DEBUG("kfsm reply ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
@@ -147,6 +157,11 @@ ack(_, _) ->
 
 
 nack(Msg, {Pid, Ref}=Tx)
+ when is_pid(Pid), is_atom(Msg) ->
+   ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   erlang:send(Pid, {Ref, Msg});
+
+nack(Msg, {Pid, Ref}=Tx)
  when is_pid(Pid) ->
    ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
    erlang:send(Pid, {error, Ref, Msg});
@@ -155,6 +170,11 @@ nack(Msg, Pid)
  when is_pid(Pid) ->
    ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Pid, Msg]),
    erlang:send(Pid, Msg); %% (?)
+
+nack(Msg, {gen, Tx})
+ when is_atom(Msg) ->
+   ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   gen_server:reply(Tx, Msg);
 
 nack(Msg, {gen, Tx}) ->
    ?DEBUG("kfsm error ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),

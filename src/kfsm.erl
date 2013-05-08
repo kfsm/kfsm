@@ -63,6 +63,9 @@ call(FSM, Msg, Timeout) ->
    Mon = erlang:monitor(process, FSM),
    erlang:send(FSM, {kfsm, {self(), Ref}, Msg}),
    receive
+      {Ref, Reply}        ->
+         erlang:demonitor(Mon, [flush]),
+         Reply;
       {ok, Ref, Reply} ->
          erlang:demonitor(Mon, [flush]),
          {ok, Reply};
