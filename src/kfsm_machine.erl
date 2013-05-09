@@ -76,7 +76,7 @@ handle_info({'$req', Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->
 
 handle_info(Msg, #machine{mod=Mod, sid=Sid}=S) ->
    ?DEBUG("kfsm recv ~p: msg ~p~n", [self(), Msg]),
-   handle_result(Mod:Sid(Msg, S#machine.state), undefined, S).
+   process_result(Mod:Sid(Msg, S#machine.state), 'out-of-bound', S).
 
 %%
 %%
@@ -89,12 +89,12 @@ code_change(_Vsn, S, _) ->
 %%%
 %%%----------------------------------------------------------------------------   
 
-handle_result(Result, undefined, #machine{q={}}=S) ->
-   handle_result(Result, null, S);
+process_result(Result, 'out-of-bound', #machine{q={}}=S) ->
+   handle_result(Result, 'out-of-bound', S);
 
-handle_result(Result, undefined, S) ->
+process_result(Result, 'out-of-bound', S) ->
    {Tx, Q} = q:deq(S#machine.q),   
-   handle_result(Result, Tx, S#machine{q=Q});
+   handle_result(Result, Tx, S#machine{q=Q}).
 
 handle_result({next_state, Sid, State}, Tx, S) ->
    {noreply, S#machine{sid=Sid, state=State, q=enq(Tx, S)}};
@@ -128,7 +128,7 @@ handle_result({stop, Reason, State}, Tx, S) ->
 
 %%
 %% enqueue transaction
-enq(undefined, S) ->
+enq('out-of-bound', S) ->
    S#machine.q;
 
 enq(Msg, S) ->
