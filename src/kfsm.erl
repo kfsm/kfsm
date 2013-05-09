@@ -50,8 +50,8 @@ cast(Pid, Msg) ->
 %%
 %% the call operation sends any message to the state machine and 
 %% waits for either any successful or any unsuccessful response
--spec(call/2 :: (fsm(), msg()) -> {ok, msg()} | {error, any()}).
--spec(call/3 :: (fsm(), msg(), timeout()) -> {ok, msg()} | {error, any()}).
+-spec(call/2 :: (fsm(), msg()) -> msg()).
+-spec(call/3 :: (fsm(), msg(), timeout()) -> msg()).
 
 call(Pid, Msg) ->
    call(Pid, Msg, 5000).

@@ -70,15 +70,7 @@ handle_cast(_, S) ->
 
 %%
 %%
-handle_info({call, Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
-   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   handle_result(Mod:Sid(Msg, S#machine.state), Tx, S);
-
-handle_info({cast, Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
-   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   handle_result(Mod:Sid(Msg, S#machine.state), Tx, S);
-
-handle_info({send, Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
+handle_info({'$req', Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
    ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
    handle_result(Mod:Sid(Msg, S#machine.state), Tx, S);
 
