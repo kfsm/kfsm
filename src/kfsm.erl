@@ -28,6 +28,8 @@
 -type(msg() :: any()).
 
 %%
+%% TODO: gen_server compatible
+%%
 %% The function creates a new container process for state machine.
 %% The function Mod:init is called to build internal state data state
 %% and defines initial state (transition function) sid. 

@@ -59,9 +59,33 @@ terminate(Reason, #machine{mod=Mod}=S) ->
 
 %%
 %%
-handle_call(Msg, Tx, #machine{mod=Mod, sid=Sid}=S) ->
+handle_call(Msg0, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
+   % synchronous out-of-bound call to machine
+   % either reply or queue request tx
    ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   handle_result(Mod:Sid(Msg, S#machine.state), Tx, S).
+   case Mod:Sid0(Msg0, S#machine.state) of
+      {next_state, Sid, State} ->
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
+      {next_state, Sid, State, TorH} ->
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}, TorH};
+      {reply, Msg, Sid, State} ->
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State}};
+      {reply, Msg, Sid, State, TorH} ->
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {error, Reason, Sid, State} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}};
+      {error, Reason, Sid, State, TorH} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {stop, Reason, Msg, State} ->
+         plib:ack(Tx, Msg),
+         {stop, Reason, S#machine{state=State}};
+      {stop, Reason, State} ->
+         {stop, Reason, S#machine{state=State}}
+   end.
 
 %%
 %%
@@ -70,13 +94,64 @@ handle_cast(_, S) ->
 
 %%
 %%
-handle_info({'$req', Tx, Msg}, #machine{mod=Mod, sid=Sid}=S) ->   
+handle_info({'$req', Tx, Msg0}, #machine{mod=Mod, sid=Sid0}=S) ->   
+   %% in-bound call to FSM
    ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   handle_result(Mod:Sid(Msg, S#machine.state), Tx, S);
+   case Mod:Sid0(Msg0, S#machine.state) of
+      {next_state, Sid, State} ->
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
+      {next_state, Sid, State, TorH} ->
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}, TorH};
+      {reply, Msg, Sid, State} ->
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State}};
+      {reply, Msg, Sid, State, TorH} ->
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {error, Reason, Sid, State} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}};
+      {error, Reason, Sid, State, TorH} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {stop, Reason, Msg, State} ->
+         plib:ack(Tx, Msg),
+         {stop, Reason, S#machine{state=State}};
+      {stop, Reason, State} ->
+         {stop, Reason, S#machine{state=State}}
+   end;
 
-handle_info(Msg, #machine{mod=Mod, sid=Sid}=S) ->
+handle_info(Msg0, #machine{mod=Mod, sid=Sid0}=S) ->
+   %% out-of-bound message
    ?DEBUG("kfsm recv ~p: msg ~p~n", [self(), Msg]),
-   process_result(Mod:Sid(Msg, S#machine.state), 'out-of-bound', S).
+   case Mod:Sid0(Msg0, S#machine.state) of
+      {next_state, Sid, State} ->
+         {noreply, S#machine{sid=Sid, state=State}};
+      {next_state, Sid, State, TorH} ->
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {reply, Msg, Sid, State} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}};
+      {reply, Msg, Sid, State, TorH} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
+      {error, Reason, Sid, State} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}};
+      {error, Reason, Sid, State, TorH} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
+      {stop, Reason, Msg, State} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, Msg),
+         {stop, Reason, S#machine{state=State, q=Q}};
+      {stop, Reason, State} ->
+         {stop, Reason, S#machine{state=State}}
+   end.
 
 %%
 %%
@@ -89,51 +164,10 @@ code_change(_Vsn, S, _) ->
 %%%
 %%%----------------------------------------------------------------------------   
 
-process_result(Result, 'out-of-bound', #machine{q={}}=S) ->
-   handle_result(Result, 'out-of-bound', S);
-
-process_result(Result, 'out-of-bound', S) ->
-   {Tx, Q} = q:deq(S#machine.q),   
-   handle_result(Result, Tx, S#machine{q=Q}).
-
-handle_result({next_state, Sid, State}, Tx, S) ->
-   {noreply, S#machine{sid=Sid, state=State, q=enq(Tx, S)}};
-
-handle_result({next_state, Sid, State, TorH}, Tx, S) ->
-   {noreply, S#machine{sid=Sid, state=State, q=enq(Tx, S)}, TorH};
-
-handle_result({reply, Msg, Sid, State}, Tx, S) ->
-   plib:ack(Tx, Msg),
-   {noreply, S#machine{sid=Sid, state=State}};
-
-handle_result({reply, Msg, Sid, State, TorH}, Tx, S) ->
-   plib:ack(Tx, Msg),
-   {noreply, S#machine{sid=Sid, state=State}, TorH};
-
-handle_result({error, Reason, Sid, State}, Tx, S) ->
-   plib:ack(Tx, {error, Reason}),
-   {noreply, S#machine{sid=Sid, state=State}};
-
-handle_result({error, Reason, Sid, State, TorH}, Tx, S) ->
-   plib:ack(Tx, {error, Reason}),
-   {noreply, S#machine{sid=Sid, state=State}, TorH};
-
-handle_result({stop, Msg, Reason, State}, Tx, S) ->
-   plib:ack(Tx, Msg),
-   {stop, Reason, S#machine{state=State}};
-
-handle_result({stop, Reason, State}, Tx, S) ->
-   {stop, Reason, S#machine{state=State}}.
-
-
-%%
-%% enqueue transaction
-enq('out-of-bound', S) ->
-   S#machine.q;
-
-enq(Msg, S) ->
-   q:enq(Msg, S#machine.q).
-
+deq_last_tx({}) ->
+   {undefined, {}};
+deq_last_tx(Q)  ->
+   q:deq(Q).
 
 
 
