@@ -21,11 +21,24 @@
 -include("kfsm.hrl").
 
 -export([
-   start_link/2, cast/2, call/2, call/3, send/2
+   start_link/2, cast/2, call/2, call/3, send/2,
+   
+   %%
+   behaviour_info/1
 ]).
 
 -type(fsm() :: atom() | pid() | any()).
 -type(msg() :: any()).
+
+%%
+%% 
+behaviour_info(callbacks) ->
+   [
+      {init, 1}
+     ,{free, 2}
+   ];
+behaviour_info(_Other) ->
+    undefined.
 
 %%
 %% TODO: gen_server compatible
