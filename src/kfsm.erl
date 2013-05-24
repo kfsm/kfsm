@@ -21,8 +21,9 @@
 -include("kfsm.hrl").
 
 -export([
-   start_link/2, cast/2, call/2, call/3, send/2,
-   
+   start_link/2, join/1, join/2, 
+   cast/2, call/2, call/3, send/2,
+
    %%
    behaviour_info/1
 ]).
@@ -50,6 +51,17 @@ behaviour_info(_Other) ->
 
 start_link(Mod, Opts) ->
    kfsm_machine:start_link(Mod, Opts).
+
+%%
+%% join external process to fsm
+-spec(join/1 :: (fsm()) -> ok | {error, any()}).
+-spec(join/2 :: (fsm(), pid()) -> ok | {error, any()}).
+
+join(Pid) ->
+   join(Pid, self()).
+
+join(Pid, A) ->
+   gen_server:call(Pid, {kfsm_join, A}).
 
 %%
 %% the cast operation sends any message to the state machine and 
