@@ -174,8 +174,10 @@ code_change(_Vsn, S, _) ->
 %%%
 %%%----------------------------------------------------------------------------   
 
-deq_last_tx({}, Tx) ->
-   {Tx, {}}; 
+deq_last_tx({}, {Pid, _Ref}) ->
+   {Pid, {}}; 
+deq_last_tx({}, Pid) ->
+   {Pid, {}}; 
 deq_last_tx(Q, _Tx)  ->
    q:deq(Q).
 
