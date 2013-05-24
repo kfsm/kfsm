@@ -31,8 +31,7 @@
    mod   :: atom(),  %% FSM implementation
    sid   :: atom(),  %% FSM state (transition function)
    state :: any(),   %% FSM internal data structure
-   q     :: any(),   %% FSM request queue
-   link  :: any()    %% FSM link
+   q     :: any()    %% FSM request queue
 }).
 
 
@@ -60,9 +59,6 @@ terminate(Reason, #machine{mod=Mod}=S) ->
 
 %%
 %%
-handle_call({kfsm_join, Pid}, _, S) ->
-   {reply, ok, S#machine{link=Pid}};
-
 handle_call(Msg0, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
    % synchronous out-of-bound call to machine
    % either reply or queue request tx
@@ -143,23 +139,23 @@ handle_info(Msg0, #machine{mod=Mod, sid=Sid0}=S) ->
          self() ! Msg,
          {noreply, S#machine{sid=Sid, state=State}};
       {reply, Msg, Sid, State} ->
-         {Tx, Q} = deq_last_tx(S#machine.q, S#machine.link),
+         {Tx, Q} = deq_last_tx(S#machine.q),
          plib:ack(Tx, Msg),
          {noreply, S#machine{sid=Sid, state=State, q=Q}};
       {reply, Msg, Sid, State, TorH} ->
-         {Tx, Q} = deq_last_tx(S#machine.q, S#machine.link),
+         {Tx, Q} = deq_last_tx(S#machine.q),
          plib:ack(Tx, Msg),
          {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
       {error, Reason, Sid, State} ->
-         {Tx, Q} = deq_last_tx(S#machine.q, S#machine.link),
+         {Tx, Q} = deq_last_tx(S#machine.q),
          plib:ack(Tx, {error, Reason}),
          {noreply, S#machine{sid=Sid, state=State, q=Q}};
       {error, Reason, Sid, State, TorH} ->
-         {Tx, Q} = deq_last_tx(S#machine.q, S#machine.link),
+         {Tx, Q} = deq_last_tx(S#machine.q),
          plib:ack(Tx, {error, Reason}),
          {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
       {stop, Reason, Msg, State} ->
-         {Tx, Q} = deq_last_tx(S#machine.q, S#machine.link),
+         {Tx, Q} = deq_last_tx(S#machine.q),
          plib:ack(Tx, Msg),
          {stop, Reason, S#machine{state=State, q=Q}};
       {stop, Reason, State} ->
@@ -177,9 +173,9 @@ code_change(_Vsn, S, _) ->
 %%%
 %%%----------------------------------------------------------------------------   
 
-deq_last_tx({}, Link) ->
-   {Link, {}}; 
-deq_last_tx(Q, _Tx)  ->
+deq_last_tx({}) ->
+   {undefined, {}}; 
+deq_last_tx(Q)  ->
    q:deq(Q).
 
 
