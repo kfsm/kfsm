@@ -71,10 +71,6 @@ handle_call(Msg0, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
       {self,  Msg, Sid, State} ->
          self() ! Msg,
          {noreply, S#machine{sid=Sid, state=State}};
-      {noreply, _Msg, Sid, State} ->
-         {noreply, S#machine{sid=Sid, state=State}};
-      {noreply, _Msg, Sid, State, TorH} ->
-         {noreply, S#machine{sid=Sid, state=State}, TorH};
       {reply, Msg, Sid, State} ->
          plib:ack(Tx, Msg),
          {noreply, S#machine{sid=Sid, state=State}};
@@ -112,10 +108,6 @@ handle_info({'$req', Tx, Msg0}, #machine{mod=Mod, sid=Sid0}=S) ->
       {self,  Msg, Sid, State} ->
          self() ! Msg,
          {noreply, S#machine{sid=Sid, state=State}};
-      {noreply, _Msg, Sid, State} ->
-         {noreply, S#machine{sid=Sid, state=State}};
-      {noreply, _Msg, Sid, State, TorH} ->
-         {noreply, S#machine{sid=Sid, state=State}, TorH};
       {reply, Msg, Sid, State} ->
          plib:ack(Tx, Msg),
          {noreply, S#machine{sid=Sid, state=State}};
@@ -146,12 +138,6 @@ handle_info(Msg0, #machine{mod=Mod, sid=Sid0}=S) ->
       {self,  Msg, Sid, State} ->
          self() ! Msg,
          {noreply, S#machine{sid=Sid, state=State}};
-      {noreply, _Msg, Sid, State} ->
-         {_Tx, Q} = deq_last_tx(S#machine.q),
-         {noreply, S#machine{sid=Sid, state=State, q=Q}};
-      {noreply, _Msg, Sid, State, TorH} ->
-         {_Tx, Q} = deq_last_tx(S#machine.q),
-         {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
       {reply, Msg, Sid, State} ->
          {Tx, Q} = deq_last_tx(S#machine.q),
          plib:ack(Tx, Msg),
