@@ -22,6 +22,7 @@
 
 -export([
    start_link/2, 
+   pipe/2, sink/3,
    cast/2, call/2, call/3, send/2,
 
    %%
@@ -51,6 +52,19 @@ behaviour_info(_Other) ->
 
 start_link(Mod, Opts) ->
    kfsm_machine:start_link(Mod, Opts).
+
+%%
+%%
+pipe(A, B) ->
+   ok = gen_server:call(A, {kfsm_pipe_b, B}),
+   ok = gen_server:call(B, {kfsm_pipe_a, A}).
+
+sink(a, Pid, Sink) ->
+   ok = gen_server:call(Pid, {kfsm_pipe_a, Sink});
+
+sink(b, Pid, Sink) ->
+   ok = gen_server:call(Pid, {kfsm_pipe_b, Sink}).
+
 
 %%
 %% the cast operation sends any message to the state machine and 

@@ -62,7 +62,7 @@ terminate(Reason, #machine{mod=Mod}=S) ->
 handle_call(Msg0, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
    % synchronous out-of-bound call to machine
    % either reply or queue request tx
-   ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
    case Mod:Sid0(Msg0, S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
@@ -99,7 +99,7 @@ handle_cast(_, S) ->
 %%
 handle_info({'$req', Tx, Msg0}, #machine{mod=Mod, sid=Sid0}=S) ->   
    %% in-bound call to FSM
-   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
    case Mod:Sid0(Msg0, S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
@@ -129,7 +129,7 @@ handle_info({'$req', Tx, Msg0}, #machine{mod=Mod, sid=Sid0}=S) ->
 
 handle_info(Msg0, #machine{mod=Mod, sid=Sid0}=S) ->
    %% out-of-bound message
-   ?DEBUG("kfsm recv ~p: msg ~p~n", [self(), Msg]),
+   ?DEBUG("kfsm recv ~p: msg ~p~n", [self(), Msg0]),
    case Mod:Sid0(Msg0, S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State}};
