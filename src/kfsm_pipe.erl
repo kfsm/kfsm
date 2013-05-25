@@ -37,20 +37,40 @@
 
 
 %%
-%%
+%% Opts allows to bind pipe at construction
 start_link(Mod, Args, Opts) ->
    gen_server:start_link(?MODULE, [Mod, Args, Opts], []).
 
 init([Mod, Args, Opts]) ->
    init(
       Mod:init(Args), 
-      #machine{mod=Mod, a=opts:val(sideA, undefined, Opts), b=opts:val(sideB, undefined, Opts)}
+      init_pipe(Opts, #machine{mod=Mod})
    ).
 
 init({ok, Sid, State}, S) ->
    {ok, S#machine{sid=Sid, state=State}};
 init({error,  Reason}, _) ->
    {stop, Reason}.   
+
+init_pipe(Opts, S) ->
+   maybe_init_pipeA(
+      opts:val(pipeA, undefined, Opts),
+      maybe_init_pipeB(
+         opts:val(pipeA, undefined, Opts), S
+      )
+   ).
+
+maybe_init_pipeA(undefined, S) ->
+   S;
+maybe_init_pipeA(Pid, S) ->
+   ok = gen_server:call(Pid, {kfsm_pipe_b, self()}),
+   S#machine{a=Pid}.
+
+maybe_init_pipeB(undefined, S) ->
+   S;
+maybe_init_pipeB(Pid, S) ->
+   ok = gen_server:call(Pid, {kfsm_pipe_a, self()}),
+   S#machine{a=Pid}.
 
 terminate(Reason, #machine{mod=Mod}=S) ->
    Mod:free(Reason, S#machine.state).   
