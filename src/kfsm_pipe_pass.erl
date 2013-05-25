@@ -15,7 +15,6 @@ free(_, _) ->
 
 pass(Msg, Pipe, S) ->
    ?DEBUG("kfsm pass: ~p pipe ~p", [Msg, Pipe]),
-   _ = plib:ack(Pipe,  ack),
-   _ = plib:send(Pipe, Msg),
+   _ = pipe:'>'(Pipe, Msg),
    {next_state, pass, S}.
 

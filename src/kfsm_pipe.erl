@@ -16,7 +16,7 @@
 %%   limitations under the License.
 %%
 %% @description
-%%    state machine container
+%%    pipe container
 -module(kfsm_pipe).
 -behaviour(gen_server).
 -include("kfsm.hrl").
@@ -32,8 +32,8 @@
    sid   :: atom(),  %% FSM state (transition function)
    state :: any(),   %% FSM internal data structure
    q     :: any(),   %% FSM request queue
-   a     :: pid(),   %% sideA
-   b     :: pid()    %% sideB
+   a     :: pid(),   %% pipe sideA
+   b     :: pid()    %% pipe sideB
 }).
 
 
@@ -69,17 +69,34 @@ handle_call({kfsm_pipe_b, Pid}, _, S) ->
    ?DEBUG("kfsm set b: ~p to ~p", [self(), Pid]),
    {reply, ok, S#machine{b=Pid}};
 
-handle_call(Msg, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
+
+handle_call(Msg0, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
    % synchronous out-of-bound call to machine
-   ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   case Mod:Sid0(Msg, pipe(Tx, S#machine.a, S#machine.b), S#machine.state) of
+   % either reply or queue request tx
+   ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
+   case Mod:Sid0(Msg0, {pipe, S#machine.a, S#machine.b}, S#machine.state) of
       {next_state, Sid, State} ->
-         {noreply, S#machine{sid=Sid, state=State}};
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
       {next_state, Sid, State, TorH} ->
-         {noreply, S#machine{sid=Sid, state=State}, TorH};
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}, TorH};
       {self,  Msg, Sid, State} ->
          self() ! Msg,
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
+      {reply, Msg, Sid, State} ->
+         plib:ack(Tx, Msg),
          {noreply, S#machine{sid=Sid, state=State}};
+      {reply, Msg, Sid, State, TorH} ->
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {error, Reason, Sid, State} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}};
+      {error, Reason, Sid, State, TorH} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {stop, Reason, Msg, State} ->
+         plib:ack(Tx, Msg),
+         {stop, Reason, S#machine{state=State}};
       {stop, Reason, State} ->
          {stop, Reason, S#machine{state=State}}
    end.
@@ -91,9 +108,9 @@ handle_cast(_, S) ->
 
 %%
 %%
-handle_info({'$req', Tx, Msg}, #machine{mod=Mod, sid=Sid0}=S) ->   
+handle_info({'$pipe', Tx, Msg}, #machine{mod=Mod, sid=Sid0}=S) ->   
    %% in-bound call to FSM
-   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
+   ?DEBUG("kfsm pipe ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
    case Mod:Sid0(Msg, pipe(Tx, S#machine.a, S#machine.b), S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State}};
@@ -106,10 +123,40 @@ handle_info({'$req', Tx, Msg}, #machine{mod=Mod, sid=Sid0}=S) ->
          {stop, Reason, S#machine{state=State}}
    end;
 
-handle_info(Msg, #machine{mod=Mod, sid=Sid0}=S) ->
+handle_info({'$req', Tx, Msg0}, #machine{mod=Mod, sid=Sid0}=S) ->   
+   %% in-bound call to FSM
+   ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
+   case Mod:Sid0(Msg0, {pipe, S#machine.a, S#machine.b}, S#machine.state) of
+      {next_state, Sid, State} ->
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
+      {next_state, Sid, State, TorH} ->
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}, TorH};
+      {self,  Msg, Sid, State} ->
+         self() ! Msg,
+         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
+      {reply, Msg, Sid, State} ->
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State}};
+      {reply, Msg, Sid, State, TorH} ->
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {error, Reason, Sid, State} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}};
+      {error, Reason, Sid, State, TorH} ->
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
+      {stop, Reason, Msg, State} ->
+         plib:ack(Tx, Msg),
+         {stop, Reason, S#machine{state=State}};
+      {stop, Reason, State} ->
+         {stop, Reason, S#machine{state=State}}
+   end;
+
+handle_info(Msg0, #machine{mod=Mod, sid=Sid0}=S) ->
    %% out-of-bound message
-   ?DEBUG("kfsm recv ~p: msg ~p~n", [self(), Msg]),
-   case Mod:Sid0(Msg, {pipe, S#machine.a, S#machine.b}, S#machine.state) of
+   ?DEBUG("kfsm recv ~p: msg ~p~n", [self(), Msg0]),
+   case Mod:Sid0(Msg0, {pipe, S#machine.a, S#machine.b}, S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State}};
       {next_state, Sid, State, TorH} ->
@@ -117,6 +164,26 @@ handle_info(Msg, #machine{mod=Mod, sid=Sid0}=S) ->
       {self,  Msg, Sid, State} ->
          self() ! Msg,
          {noreply, S#machine{sid=Sid, state=State}};
+      {reply, Msg, Sid, State} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}};
+      {reply, Msg, Sid, State, TorH} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, Msg),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
+      {error, Reason, Sid, State} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}};
+      {error, Reason, Sid, State, TorH} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, {error, Reason}),
+         {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
+      {stop, Reason, Msg, State} ->
+         {Tx, Q} = deq_last_tx(S#machine.q),
+         plib:ack(Tx, Msg),
+         {stop, Reason, S#machine{state=State, q=Q}};
       {stop, Reason, State} ->
          {stop, Reason, S#machine{state=State}}
    end.
@@ -131,6 +198,13 @@ code_change(_Vsn, S, _) ->
 %%% private
 %%%
 %%%----------------------------------------------------------------------------   
+
+%%
+deq_last_tx({}) ->
+   {undefined, {}}; 
+deq_last_tx(Q)  ->
+   q:deq(Q).
+
 
 %% build i/o pipe
 pipe(Tx, A, B) ->
