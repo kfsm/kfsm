@@ -31,7 +31,6 @@
    mod   :: atom(),  %% FSM implementation
    sid   :: atom(),  %% FSM state (transition function)
    state :: any(),   %% FSM internal data structure
-   q     :: any(),   %% FSM request queue
    a     :: pid(),   %% pipe sideA
    b     :: pid()    %% pipe sideB
 }).
@@ -43,7 +42,7 @@ start_link(Mod, Args) ->
    gen_server:start_link(?MODULE, [Mod, Args], []).
 
 init([Mod, Args]) ->
-   init(Mod:init(Args), #machine{mod=Mod, q=q:new()}).
+   init(Mod:init(Args), #machine{mod=Mod}).
 
 init({ok, Sid, State}, S) ->
    {ok, S#machine{sid=Sid, state=State}};
@@ -74,29 +73,14 @@ handle_call(Msg0, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
    % synchronous out-of-bound call to machine
    % either reply or queue request tx
    ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
-   case Mod:Sid0(Msg0, {pipe, S#machine.a, S#machine.b}, S#machine.state) of
+   case Mod:Sid0(Msg0, pipe(Tx, S#machine.a, S#machine.b), S#machine.state) of
       {next_state, Sid, State} ->
-         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
+         {noreply, S#machine{sid=Sid, state=State}};
       {next_state, Sid, State, TorH} ->
-         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}, TorH};
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
       {self,  Msg, Sid, State} ->
          self() ! Msg,
-         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
-      {reply, Msg, Sid, State} ->
-         plib:ack(Tx, Msg),
          {noreply, S#machine{sid=Sid, state=State}};
-      {reply, Msg, Sid, State, TorH} ->
-         plib:ack(Tx, Msg),
-         {noreply, S#machine{sid=Sid, state=State}, TorH};
-      {error, Reason, Sid, State} ->
-         plib:ack(Tx, {error, Reason}),
-         {noreply, S#machine{sid=Sid, state=State}};
-      {error, Reason, Sid, State, TorH} ->
-         plib:ack(Tx, {error, Reason}),
-         {noreply, S#machine{sid=Sid, state=State}, TorH};
-      {stop, Reason, Msg, State} ->
-         plib:ack(Tx, Msg),
-         {stop, Reason, S#machine{state=State}};
       {stop, Reason, State} ->
          {stop, Reason, S#machine{state=State}}
    end.
@@ -126,29 +110,14 @@ handle_info({'$pipe', Tx, Msg}, #machine{mod=Mod, sid=Sid0}=S) ->
 handle_info({'$req', Tx, Msg0}, #machine{mod=Mod, sid=Sid0}=S) ->   
    %% in-bound call to FSM
    ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
-   case Mod:Sid0(Msg0, {pipe, S#machine.a, S#machine.b}, S#machine.state) of
+   case Mod:Sid0(Msg0, pipe(Tx, S#machine.a, S#machine.b), S#machine.state) of
       {next_state, Sid, State} ->
-         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
+         {noreply, S#machine{sid=Sid, state=State}};
       {next_state, Sid, State, TorH} ->
-         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}, TorH};
+         {noreply, S#machine{sid=Sid, state=State}, TorH};
       {self,  Msg, Sid, State} ->
          self() ! Msg,
-         {noreply, S#machine{sid=Sid, state=State, q=q:enq(Tx, S#machine.q)}};
-      {reply, Msg, Sid, State} ->
-         plib:ack(Tx, Msg),
          {noreply, S#machine{sid=Sid, state=State}};
-      {reply, Msg, Sid, State, TorH} ->
-         plib:ack(Tx, Msg),
-         {noreply, S#machine{sid=Sid, state=State}, TorH};
-      {error, Reason, Sid, State} ->
-         plib:ack(Tx, {error, Reason}),
-         {noreply, S#machine{sid=Sid, state=State}};
-      {error, Reason, Sid, State, TorH} ->
-         plib:ack(Tx, {error, Reason}),
-         {noreply, S#machine{sid=Sid, state=State}, TorH};
-      {stop, Reason, Msg, State} ->
-         plib:ack(Tx, Msg),
-         {stop, Reason, S#machine{state=State}};
       {stop, Reason, State} ->
          {stop, Reason, S#machine{state=State}}
    end;
@@ -164,26 +133,6 @@ handle_info(Msg0, #machine{mod=Mod, sid=Sid0}=S) ->
       {self,  Msg, Sid, State} ->
          self() ! Msg,
          {noreply, S#machine{sid=Sid, state=State}};
-      {reply, Msg, Sid, State} ->
-         {Tx, Q} = deq_last_tx(S#machine.q),
-         plib:ack(Tx, Msg),
-         {noreply, S#machine{sid=Sid, state=State, q=Q}};
-      {reply, Msg, Sid, State, TorH} ->
-         {Tx, Q} = deq_last_tx(S#machine.q),
-         plib:ack(Tx, Msg),
-         {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
-      {error, Reason, Sid, State} ->
-         {Tx, Q} = deq_last_tx(S#machine.q),
-         plib:ack(Tx, {error, Reason}),
-         {noreply, S#machine{sid=Sid, state=State, q=Q}};
-      {error, Reason, Sid, State, TorH} ->
-         {Tx, Q} = deq_last_tx(S#machine.q),
-         plib:ack(Tx, {error, Reason}),
-         {noreply, S#machine{sid=Sid, state=State, q=Q}, TorH};
-      {stop, Reason, Msg, State} ->
-         {Tx, Q} = deq_last_tx(S#machine.q),
-         plib:ack(Tx, Msg),
-         {stop, Reason, S#machine{state=State, q=Q}};
       {stop, Reason, State} ->
          {stop, Reason, S#machine{state=State}}
    end.
@@ -198,13 +147,6 @@ code_change(_Vsn, S, _) ->
 %%% private
 %%%
 %%%----------------------------------------------------------------------------   
-
-%%
-deq_last_tx({}) ->
-   {undefined, {}}; 
-deq_last_tx(Q)  ->
-   q:deq(Q).
-
 
 %% build i/o pipe
 pipe(Tx, A, B) ->
