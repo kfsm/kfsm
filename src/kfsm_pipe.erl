@@ -56,7 +56,7 @@ init_pipe(Opts, S) ->
    maybe_init_pipeA(
       opts:val(pipeA, undefined, Opts),
       maybe_init_pipeB(
-         opts:val(pipeA, undefined, Opts), S
+         opts:val(pipeB, undefined, Opts), S
       )
    ).
 
@@ -70,7 +70,7 @@ maybe_init_pipeB(undefined, S) ->
    S;
 maybe_init_pipeB(Pid, S) ->
    ok = gen_server:call(Pid, {kfsm_pipe_a, self()}),
-   S#machine{a=Pid}.
+   S#machine{b=Pid}.
 
 terminate(Reason, #machine{mod=Mod}=S) ->
    Mod:free(Reason, S#machine.state).   
