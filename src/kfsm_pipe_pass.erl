@@ -4,8 +4,11 @@
 -include("kfsm.hrl").
 
 -export([
-   init/1, free/2, pass/3
+   start_link/0, init/1, free/2, pass/3
 ]).
+
+start_link() ->
+   kfsm_pipe:start_link(?MODULE, []).
 
 init(_) ->
    {ok, pass, undefined}.

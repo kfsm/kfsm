@@ -22,7 +22,7 @@
 -include("kfsm.hrl").
 
 -export([
-   start_link/3, 
+   start_link/2, 
    init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3
 ]).
 
@@ -31,46 +31,23 @@
    mod   :: atom(),  %% FSM implementation
    sid   :: atom(),  %% FSM state (transition function)
    state :: any(),   %% FSM internal data structure
-   a     :: pid(),   %% pipe sideA
-   b     :: pid()    %% pipe sideB
+   a     :: pid(),   %% pipe side (a) // source
+   b     :: pid()    %% pipe side (b) // sink
 }).
 
 
 %%
 %% Opts allows to bind pipe at construction
-start_link(Mod, Args, Opts) ->
-   gen_server:start_link(?MODULE, [Mod, Args, Opts], []).
+start_link(Mod, Args) ->
+   gen_server:start_link(?MODULE, [Mod, Args], []).
 
-init([Mod, Args, Opts]) ->
-   init(
-      Mod:init(Args), 
-      init_pipe(Opts, #machine{mod=Mod})
-   ).
+init([Mod, Args]) ->
+   init(Mod:init(Args), #machine{mod=Mod}).
 
 init({ok, Sid, State}, S) ->
    {ok, S#machine{sid=Sid, state=State}};
 init({error,  Reason}, _) ->
    {stop, Reason}.   
-
-init_pipe(Opts, S) ->
-   maybe_init_pipeA(
-      opts:val(pipeA, undefined, Opts),
-      maybe_init_pipeB(
-         opts:val(pipeB, undefined, Opts), S
-      )
-   ).
-
-maybe_init_pipeA(undefined, S) ->
-   S;
-maybe_init_pipeA(Pid, S) ->
-   ok = gen_server:call(Pid, {kfsm_pipe_b, self()}),
-   S#machine{a=Pid}.
-
-maybe_init_pipeB(undefined, S) ->
-   S;
-maybe_init_pipeB(Pid, S) ->
-   ok = gen_server:call(Pid, {kfsm_pipe_a, self()}),
-   S#machine{b=Pid}.
 
 terminate(Reason, #machine{mod=Mod}=S) ->
    Mod:free(Reason, S#machine.state).   
@@ -81,22 +58,11 @@ terminate(Reason, #machine{mod=Mod}=S) ->
 %%%
 %%%----------------------------------------------------------------------------   
 
-%%
-%%
-handle_call({kfsm_pipe_a, Pid}, _, S) ->
-   ?DEBUG("kfsm set a: ~p to ~p", [self(), Pid]),
-   {reply, ok, S#machine{a=Pid}};
-
-handle_call({kfsm_pipe_b, Pid}, _, S) ->
-   ?DEBUG("kfsm set b: ~p to ~p", [self(), Pid]),
-   {reply, ok, S#machine{b=Pid}};
-
-
 handle_call(Msg0, Tx, #machine{mod=Mod, sid=Sid0}=S) ->
    % synchronous out-of-bound call to machine
    % either reply or queue request tx
    ?DEBUG("kfsm call ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
-   case Mod:Sid0(Msg0, pipe(Tx, S#machine.a, S#machine.b), S#machine.state) of
+   case Mod:Sid0(Msg0, pipe:make(Tx, S#machine.a, S#machine.b), S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State}};
       {next_state, Sid, State, TorH} ->
@@ -115,10 +81,18 @@ handle_cast(_, S) ->
 
 %%
 %%
+handle_info({'$pipe', '$a', Pid}, S) ->
+   ?DEBUG("kfsm pipe ~p: a to ~p", [self(), Pid]),
+   {noreply, S#machine{a=Pid}};
+
+handle_info({'$pipe', '$b', Pid}, S) ->
+   ?DEBUG("kfsm pipe ~p: b to ~p", [self(), Pid]),
+   {noreply, S#machine{b=Pid}};
+
 handle_info({'$pipe', Tx, Msg}, #machine{mod=Mod, sid=Sid0}=S) ->   
    %% in-bound call to FSM
    ?DEBUG("kfsm pipe ~p: tx ~p, msg ~p~n", [self(), Tx, Msg]),
-   case Mod:Sid0(Msg, pipe(Tx, S#machine.a, S#machine.b), S#machine.state) of
+   case Mod:Sid0(Msg, pipe:make(Tx, S#machine.a, S#machine.b), S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State}};
       {next_state, Sid, State, TorH} ->
@@ -133,7 +107,7 @@ handle_info({'$pipe', Tx, Msg}, #machine{mod=Mod, sid=Sid0}=S) ->
 handle_info({'$req', Tx, Msg0}, #machine{mod=Mod, sid=Sid0}=S) ->   
    %% in-bound call to FSM
    ?DEBUG("kfsm cast ~p: tx ~p, msg ~p~n", [self(), Tx, Msg0]),
-   case Mod:Sid0(Msg0, pipe(Tx, S#machine.a, S#machine.b), S#machine.state) of
+   case Mod:Sid0(Msg0, pipe:make(Tx, S#machine.a, S#machine.b), S#machine.state) of
       {next_state, Sid, State} ->
          {noreply, S#machine{sid=Sid, state=State}};
       {next_state, Sid, State, TorH} ->
@@ -171,16 +145,3 @@ code_change(_Vsn, S, _) ->
 %%%
 %%%----------------------------------------------------------------------------   
 
-%% build i/o pipe
-pipe(Tx, A, B) ->
-   case plib:pid(Tx) of
-      A -> 
-         {pipe, Tx, B};
-      B -> 
-         {pipe, Tx, A};
-      _ -> 
-         case A of
-            undefined -> {pipe, Tx, B};
-            _         -> {pipe, Tx, A}
-         end
-   end.
