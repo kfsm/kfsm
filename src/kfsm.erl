@@ -22,14 +22,8 @@
 
 -export([
    start_link/2, 
-   cast/2, call/2, call/3, send/2,
-
-   %%
    behaviour_info/1
 ]).
-
--type(fsm() :: atom() | pid() | any()).
--type(msg() :: any()).
 
 %%
 %% 
@@ -51,37 +45,4 @@ behaviour_info(_Other) ->
 
 start_link(Mod, Opts) ->
    kfsm_machine:start_link(Mod, Opts).
-
-
-%%
-%% the cast operation sends any message to the state machine and 
-%% immediately returns unique reference. The reference allows to 
-%% asynchronously “wait” for either any successful or any unsuccessful
-%% response (e.g. response message signature is {ok|error,ref,any}).
-%% the reference is automatically generated using erlang:make_ref
--spec(cast/2 :: (fsm(), msg()) -> reference()).
-
-cast(Pid, Msg) ->
-   plib:cast(Pid, Msg).
-
-%%
-%% the call operation sends any message to the state machine and 
-%% waits for either any successful or any unsuccessful response
--spec(call/2 :: (fsm(), msg()) -> msg()).
--spec(call/3 :: (fsm(), msg(), timeout()) -> msg()).
-
-call(Pid, Msg) ->
-   call(Pid, Msg, 5000).
-
-call(Pid, Msg, Timeout) ->
-   plib:call(Pid, Msg, Timeout).
-
-%%
-%%
--spec(send/2 :: (fsm(), msg()) -> ok).
-
-send(Pid, Msg) ->
-   plib:send(Pid, Msg).
-
-
 

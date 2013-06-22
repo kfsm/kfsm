@@ -1,7 +1,7 @@
 -module(kfsm_echo).
 
 -export([
-   init/1, free/2, echo/2
+   init/1, free/2, echo/3
 ]).
 
 init(_) ->
@@ -10,14 +10,19 @@ init(_) ->
 free(_, _) ->
    ok.
 
-echo(badarg, S) ->
-   {error, badarg, echo, S};
+%% error
+echo(badarg, Tx, S) ->
+   plib:ack(Tx, {error, badarg}),
+   {next_state, echo, S};
 
-echo(ping,   S)  ->
-   {next_state, echo, S, 100};
+%% long tx
+echo(ping, Tx, S)  ->
+   {next_state, echo, Tx, 100};
+echo(timeout, _, S) ->
+   plib:ack(S, pong),
+   {next_state, echo, undefined};
 
-echo(timeout, S) ->
-   {reply, pong, echo, S};
-
-echo(Msg, S) ->
-   {reply, Msg,    echo, S}.
+%% echo
+echo(Msg, Tx, S) ->
+   plib:ack(Tx, Msg),
+   {next_state, echo, S}.

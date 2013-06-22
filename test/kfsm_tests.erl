@@ -13,12 +13,12 @@ kfsm_test_() ->
          ,{"call success",    fun call_success/0}
          ,{"call failure",    fun call_failure/0}
 
-         ,{"send success",    fun send_success/0}
-         ,{"send failure",    fun send_failure/0}
+         ,{"emit success",    fun emit_success/0}
+         ,{"emit failure",    fun emit_failure/0}
 
          ,{"long cast success",    fun long_cast_success/0}
          ,{"long call success",    fun long_call_success/0}
-         ,{"long send success",    fun long_send_success/0}
+         ,{"long send success",    fun long_emit_success/0}
       ]
    }.
 
@@ -33,41 +33,41 @@ free(Pid) ->
 
 
 cast_success() ->
-   Ref1 = kfsm:cast('FSM', message),
+   Ref1 = plib:cast('FSM', message),
    receive {Ref1, message} -> ok end.
 
 long_cast_success() ->
-   Ref1 = kfsm:cast('FSM', ping),
+   Ref1 = plib:cast('FSM', ping),
    receive {Ref1, pong} -> ok end.
 
 cast_failure() ->
-   Ref2 = kfsm:cast('FSM', badarg),
+   Ref2 = plib:cast('FSM', badarg),
    receive {Ref2, {error, badarg}} -> ok end.
 
 
 call_success() ->
-   message = kfsm:call('FSM', message),
+   message = plib:call('FSM', message),
    message = gen_server:call('FSM', message).
 
 long_call_success() ->
-   pong = kfsm:call('FSM', ping),
+   pong = plib:call('FSM', ping),
    pong = gen_server:call('FSM', ping).
 
 call_failure() ->
-   {error, badarg} = kfsm:call('FSM', badarg),
+   {error, badarg} = plib:call('FSM', badarg),
    {error, badarg} = gen_server:call('FSM', badarg).
    
 
-send_success() ->
-   ok = kfsm:send('FSM', message),
+emit_success() ->
+   ok = plib:emit('FSM', message),
    receive message -> ok end.
 
-long_send_success() ->
-   ok = kfsm:send('FSM', ping),
+long_emit_success() ->
+   ok = plib:emit('FSM', ping),
    receive pong -> ok end.
 
-send_failure() ->
-   ok = kfsm:send('FSM', badarg),
+emit_failure() ->
+   ok = plib:emit('FSM', badarg),
    receive {error, badarg} -> ok end.
 
 
