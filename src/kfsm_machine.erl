@@ -22,8 +22,12 @@
 -include("kfsm.hrl").
 
 -export([
-   start_link/2, 
-   init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3
+   init/1, 
+   terminate/2,
+   handle_call/3,
+   handle_cast/2,
+   handle_info/2,
+   code_change/3
 ]).
 
 %% internal state
@@ -33,11 +37,11 @@
    state :: any()    %% FSM internal data structure
 }).
 
-
-%%
-%%
-start_link(Mod, Args) ->
-   gen_server:start_link(?MODULE, [Mod, Args], []).
+%%%----------------------------------------------------------------------------   
+%%%
+%%% Factory
+%%%
+%%%----------------------------------------------------------------------------   
 
 init([Mod, Args]) ->
    init(Mod:init(Args), #machine{mod=Mod}).

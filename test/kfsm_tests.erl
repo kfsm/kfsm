@@ -23,7 +23,7 @@ kfsm_test_() ->
    }.
 
 init() ->
-   {ok, Pid} = kfsm:start_link(kfsm_echo, []),
+   {ok, Pid} = kfsm:start_link(kfsm_echo, [], []),
    erlang:register('FSM', Pid),
    Pid.
 

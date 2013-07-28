@@ -1,7 +1,7 @@
 {application, kfsm,
    [
       {description, "finite state machine"},
-      {vsn,         "2.0.0"},
+      {vsn,         "2.1.0"},
       {modules,     [
          kfsm,
          kfsm_sup,
@@ -12,7 +12,6 @@
          kernel,
          stdlib
       ]},
-      {mod, {kfsm_app, []}},
       {env, []}
    ]
 }.  

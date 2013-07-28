@@ -21,9 +21,16 @@
 -include("kfsm.hrl").
 
 -export([
-   start_link/2, 
+   start/3,
+   start/4,
+   start_link/3,
+   start_link/4,
    behaviour_info/1
 ]).
+
+-type(name() :: {local, atom()} | {global, atom()}).
+
+-define(CONTAINER, kfsm_machine).
 
 %%
 %% 
@@ -35,14 +42,21 @@ behaviour_info(callbacks) ->
 behaviour_info(_Other) ->
     undefined.
 
-%%
-%% TODO: gen_server compatible
-%%
-%% The function creates a new container process for state machine.
-%% The function Mod:init is called to build internal state data state
-%% and defines initial state (transition function) sid. 
--spec(start_link/2 :: (atom(), list()) -> {ok, pid()} | {error, any()}).
 
-start_link(Mod, Opts) ->
-   kfsm_machine:start_link(Mod, Opts).
+%%
+%% start fsm process
+-spec(start/3 :: (atom(), list(), list()) -> {ok, pid()} | {error, any()}).
+-spec(start/4 :: (name(), atom(), list(), list()) -> {ok, pid()} | {error, any()}).
+-spec(start_link/3 :: (atom(), list(), list()) -> {ok, pid()} | {error, any()}).
+-spec(start_link/4 :: (name(), atom(), list(), list()) -> {ok, pid()} | {error, any()}).
+
+start(Mod, Args, Opts) ->
+   gen_server:start(?CONTAINER, [Mod, Args], Opts).
+start(Name, Mod, Args, Opts) ->
+   gen_server:start(Name, ?CONTAINER, [Mod, Args], Opts).
+
+start_link(Mod, Args, Opts) ->
+   gen_server:start_link(?CONTAINER, [Mod, Args], Opts).
+start_link(Name, Mod, Args, Opts) ->
+   gen_server:start_link(Name, ?CONTAINER, [Mod, Args], Opts).
 
