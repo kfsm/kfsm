@@ -25,6 +25,7 @@
    start/4,
    start_link/3,
    start_link/4,
+   ioctl/2,
    behaviour_info/1
 ]).
 
@@ -38,6 +39,7 @@ behaviour_info(callbacks) ->
    [
       {init, 1}
      ,{free, 2}
+     ,{ioctl,2}
    ];
 behaviour_info(_Other) ->
     undefined.
@@ -59,4 +61,15 @@ start_link(Mod, Args, Opts) ->
    gen_server:start_link(?CONTAINER, [Mod, Args], Opts).
 start_link(Name, Mod, Args, Opts) ->
    gen_server:start_link(Name, ?CONTAINER, [Mod, Args], Opts).
+
+%%
+%% ioctl interface
+-spec(ioctl/2 :: (pid(), atom() | {atom(), any()}) -> any()).
+
+ioctl(Pid, {Req, Val})
+ when is_atom(Req) ->
+   gen_server:call(Pid, {ioctl, Req, Val});
+ioctl(Pid, Req)
+ when is_atom(Req) ->
+   gen_server:call(Pid, {ioctl, Req}).
 
